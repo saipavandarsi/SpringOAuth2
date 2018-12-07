@@ -1,0 +1,99 @@
+buildscript {
+    repositories {
+        maven {
+            url "https://plugins.gradle.org/m2/"
+        }
+        mavenCentral()
+    }
+    dependencies {
+        classpath('org.springframework.boot:spring-boot-gradle-plugin:2.0.5.RELEASE')
+        classpath('gradle.plugin.com.palantir.gradle.docker:gradle-docker:0.20.1')
+    }
+}
+
+apply plugin: 'java'
+apply plugin: 'groovy'
+apply plugin: 'eclipse'
+apply plugin: 'idea'
+apply plugin: 'org.springframework.boot'
+apply plugin: 'io.spring.dependency-management'
+apply plugin: 'com.palantir.docker'
+apply plugin: 'com.palantir.docker-run'
+
+// This is used as the docker image prefix (org)
+group = 'researchnow.com'
+def dockerRepositoryHost = 'docker.researchnow.com'
+
+bootRun {
+    systemProperties System.properties
+}
+
+bootJar {
+    baseName = 'gfs-api'
+    version =  '0.1.0'
+}
+
+task unpack(type: Copy) {
+    dependsOn bootJar
+    from(zipTree(tasks.bootJar.outputs.files.singleFile))
+    into("build/dependency")
+}
+docker {
+    name "${project.group}/${bootJar.baseName}:${bootJar.version}"
+    tags "${bootJar.version}"
+    copySpec.from(tasks.unpack.outputs).into("dependency")
+    buildArgs(['DEPENDENCY': "dependency"])
+}
+
+repositories {
+    mavenCentral()
+}
+
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+
+dependencies {
+    compile "org.codehaus.groovy:groovy-all:2.4.15"
+    compile('org.springframework.cloud:spring-cloud-starter-config')
+    compile('org.springframework.boot:spring-boot-starter-actuator')
+    compile('org.springframework.boot:spring-boot-starter-web')
+    compile('org.springframework.boot:spring-boot-starter-security')
+    compile('org.springframework.boot:spring-boot-starter-data-jpa') //1
+    compile('org.springframework.boot:spring-boot-devtools')
+    compile('com.h2database:h2') //1
+
+    compile('org.springframework.security.oauth:spring-security-oauth2')
+    //compile('org.springframework.security:spring-security-oauth2-core')
+    compile('org.springframework.security.oauth:spring-security-oauth2:2.1.0.RELEASE')
+    compile('org.springframework.security.oauth.boot:spring-security-oauth2-autoconfigure')
+    compile('org.springframework.security:spring-security-jwt:1.0.7.RELEASE')
+    compile('com.fasterxml.jackson.core:jackson-databind:2.9.7')
+
+    compile('org.springframework.data:spring-data-rest-hal-browser')
+    runtime('org.springframework.boot:spring-boot-devtools')
+
+
+   // testCompile("com.h2database:spring-boot-starter-test")
+    testCompile("org.springframework.boot:spring-boot-starter-test")
+    testCompile "org.spockframework:spock-core:1.2-groovy-2.4"
+
+    // optional dependencies for using Spock
+    testCompile "org.hamcrest:hamcrest-core:1.3" // only necessary if Hamcrest matchers are used
+    testRuntime "net.bytebuddy:byte-buddy:1.8.21"          // allows mocking of classes (in addition to interfaces)
+    testRuntime "org.objenesis:objenesis:2.6"    // allows mocking of classes without default constructor (together with CGLIB)
+}
+
+dependencyManagement {
+    imports {
+        mavenBom "org.springframework.cloud:spring-cloud-dependencies:Finchley.SR1"
+    }
+}
+
+repositories {
+    maven {
+        url 'https://repo.spring.io/libs-milestone'
+    }
+    maven {
+        url 'https://repo.spring.io/libs-snapshot'
+    }
+}
